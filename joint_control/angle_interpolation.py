@@ -22,6 +22,7 @@
 
 from pid import PIDAgent
 from keyframes import hello
+import numpy as np
 
 
 class AngleInterpolationAgent(PIDAgent):
@@ -42,6 +43,41 @@ class AngleInterpolationAgent(PIDAgent):
     def angle_interpolation(self, keyframes, perception):
         target_joints = {}
         # YOUR CODE HERE
+    
+        # Unpack keyframes data
+        joints, times, keys = keyframes
+    
+        # Compute current time (adjust based on your initialization logic)
+        current_time = perception.time - self.init_timestamp
+    
+        # Cubic Bezier Interpolation
+        for joint_index in range(len(joints)):
+            # Get correct keyframe data
+            keyframe_angles = keys[joint_index]
+            keyframe_times = times[joint_index]
+            
+            # Iterate through keyframes
+            for i in range(len(keyframe_angles) - 1):
+                if keyframe_times[i] <= current_time < keyframe_times[i + 1]:
+                    P0 = keyframe_angles[i][0]
+                    P3 = keyframe_angles[i + 1][0]
+                    
+                    # Compute control points
+                    P1 = P0 + keyframe_angles[i][1][2]
+                    P2 = P3 + keyframe_angles[i][2][2]
+                    
+                    # Calculate interpolation parameter
+                    t = (current_time - keyframe_times[i]) / (keyframe_times[i + 1] - keyframe_times[i])
+                    
+                    # Perform cubic Bezier interpolation
+                    target_joints[joints[joint_index]] = (1 - t) ** 3 * P0 + 3 * (1 - t) ** 2 * t * P1 + \
+                                                        3 * (1 - t) * t ** 2 * P2 + t ** 3 * P3
+                    break  # Exit loop if interpolation is done between two keyframes
+            
+        # Ensure symmetry
+        if 'LHipYawPitch' in target_joints:
+            target_joints['RHipYawPitch'] = target_joints['LHipYawPitch']
+        
 
         return target_joints
 
