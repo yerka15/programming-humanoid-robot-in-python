@@ -19,9 +19,10 @@
 # add PYTHONPATH
 import os
 import sys
+import numpy as np
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(__file__)), '..', 'joint_control'))
 
-from numpy.matlib import matrix, identity
+from numpy.matlib import matrix, identity, cos, sin
 
 from recognize_posture import PostureRecognitionAgent
 
@@ -36,8 +37,13 @@ class ForwardKinematicsAgent(PostureRecognitionAgent):
         self.transforms = {n: identity(4) for n in self.joint_names}
 
         # chains defines the name of chain and joints of the chain
-        self.chains = {'Head': ['HeadYaw', 'HeadPitch']
+        self.chains = {'Head': ['HeadYaw', 'HeadPitch'],
                        # YOUR CODE HERE
+                        'LeftArm': ['LShoulderPitch', 'LShoulderRoll', 'LElbowYaw', 'LElbowRoll', 'LWristYaw'],
+                        'RightArm': ['RShoulderPitch', 'RShoulderRoll', 'RElbowYaw', 'RElbowRoll', 'RWristYaw'],
+                        'LeftLeg': ['LHipYawPitch', 'LHipRoll', 'LHipPitch', 'LKneePitch', 'LAnklePitch', 'LAnkleRoll'],
+                        'RightLeg': ['RHipYawPitch', 'RHipRoll', 'RHipPitch', 'RKneePitch', 'RAnklePitch', 'RAnkleRoll']
+        
                        }
 
     def think(self, perception):
@@ -55,6 +61,44 @@ class ForwardKinematicsAgent(PostureRecognitionAgent):
         T = identity(4)
         # YOUR CODE HERE
 
+        # Define the axis of rotation for each joint and their link lengths
+        if joint_name in ['HeadYaw', 'HeadPitch']:
+            axis = 'z' if joint_name == 'HeadYaw' else 'y'
+        elif joint_name in ['LShoulderPitch', 'RShoulderPitch']:
+            axis = 'y'
+        elif joint_name in ['LShoulderRoll', 'RShoulderRoll']:
+            axis = 'x'
+        elif joint_name in ['LElbowYaw', 'RElbowYaw', 'LElbowRoll', 'RElbowRoll', 'LWristYaw', 'RWristYaw']:
+            axis = 'z' if 'Yaw' in joint_name else 'x'
+        elif joint_name in ['LHipYawPitch', 'RHipYawPitch']:
+            axis = 'z'
+        elif joint_name in ['LHipRoll', 'RHipRoll']:
+            axis = 'x'
+        elif joint_name in ['LHipPitch', 'RHipPitch', 'LKneePitch', 'RKneePitch', 'LAnklePitch', 'RAnklePitch']:
+            axis = 'y'
+        elif joint_name in ['LAnkleRoll', 'RAnkleRoll']:
+            axis = 'x'
+
+        # Create rotation matrix based on the axis
+        if axis == 'x':
+            T[:3, :3] = [
+                [1, 0, 0],
+                [0, cos(joint_angle), -sin(joint_angle)],
+                [0, sin(joint_angle), cos(joint_angle)]
+            ]
+        elif axis == 'y':
+            T[:3, :3] = [
+                [cos(joint_angle), 0, sin(joint_angle)],
+                [0, 1, 0],
+                [-sin(joint_angle), 0, cos(joint_angle)]
+            ]
+        elif axis == 'z':
+            T[:3, :3] = [
+                [cos(joint_angle), -sin(joint_angle), 0],
+                [sin(joint_angle), cos(joint_angle), 0],
+                [0, 0, 1]
+            ]
+
         return T
 
     def forward_kinematics(self, joints):
@@ -68,7 +112,7 @@ class ForwardKinematicsAgent(PostureRecognitionAgent):
                 angle = joints[joint]
                 Tl = self.local_trans(joint, angle)
                 # YOUR CODE HERE
-
+                T = T @ Tl  # Matrix multiplication
                 self.transforms[joint] = T
 
 if __name__ == '__main__':
